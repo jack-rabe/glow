@@ -76,13 +76,6 @@ func sourceFromArg(arg string) (*source, error) {
 		return &source{reader: os.Stdin}, nil
 	}
 
-	// a GitHub or GitLab URL (even without the protocol):
-	src, err := readmeURL(arg)
-	if src != nil && err == nil {
-		// if there's an error, try next methods...
-		return src, nil
-	}
-
 	// HTTP(S) URLs:
 	if u, err := url.ParseRequestURI(arg); err == nil && strings.Contains(arg, "://") { //nolint:nestif
 		if u.Scheme != "" {
@@ -328,10 +321,7 @@ func executeCLI(cmd *cobra.Command, src *source, w io.Writer) error {
 		}
 		return nil
 	case tui || cmd.Flags().Changed("tui"):
-		path := ""
-		if !isURL(src.URL) {
-			path = src.URL
-		}
+		path := src.URL
 		return runTUI(path, content)
 	default:
 		if _, err = fmt.Fprint(w, out); err != nil {
