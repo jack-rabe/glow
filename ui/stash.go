@@ -515,17 +515,6 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 			m.loaded = false
 			return findLocalFiles(*m.common)
 
-		// Edit document in EDITOR
-		case "e":
-			md := m.selectedMarkdown()
-
-			// In case no file is available
-			if md == nil {
-				return nil
-			}
-
-			return openEditor(md.localPath, 0)
-
 		// Open document
 		case keyEnter:
 			m.hideStatusMessage()

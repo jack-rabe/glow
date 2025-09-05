@@ -215,18 +215,6 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 				cmds = append(cmds, viewport.Sync(m.viewport))
 			}
 
-		case "e":
-			lineno := int(math.RoundToEven(float64(m.viewport.TotalLineCount()) * m.viewport.ScrollPercent()))
-			if m.viewport.AtTop() {
-				lineno = 0
-			}
-			log.Info(
-				"opening editor",
-				"file", m.currentDocument.localPath,
-				"line", fmt.Sprintf("%d/%d", lineno, m.viewport.TotalLineCount()),
-			)
-			return m, openEditor(m.currentDocument.localPath, lineno)
-
 		case "c":
 			// Copy using OSC 52
 			termenv.Copy(m.currentDocument.Body)
@@ -256,12 +244,6 @@ func (m pagerModel) update(msg tea.Msg) (pagerModel, tea.Cmd) {
 
 	// The file was changed on disk and we're reloading it
 	case reloadMsg:
-		return m, loadLocalMarkdown(&m.currentDocument)
-
-	// We've finished editing the document, potentially making changes. Let's
-	// retrieve the latest version of the document so that we display
-	// up-to-date contents.
-	case editorFinishedMsg:
 		return m, loadLocalMarkdown(&m.currentDocument)
 
 	// We've received terminal dimensions, either for the first time or
@@ -370,7 +352,6 @@ func (m pagerModel) helpView() (s string) {
 		"g/home  go to top",
 		"G/end   go to bottom",
 		"c       copy contents",
-		"e       edit this document",
 		"r       reload this document",
 		"esc     back to files",
 		"q       quit",
