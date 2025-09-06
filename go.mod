@@ -31,7 +31,11 @@ require (
 	golang.org/x/text v0.28.0
 )
 
+require github.com/andybalholm/cascadia v1.3.3 // indirect
+
 require (
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
