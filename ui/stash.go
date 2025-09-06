@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/glow/v2/docs"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/log"
 	"github.com/muesli/reflow/ansi"
@@ -53,6 +54,7 @@ var (
 type (
 	filteredMarkdownMsg []*markdown
 	fetchedMarkdownMsg  *markdown
+	searchMessage       docs.SearchResponse
 )
 
 // MODEL
@@ -62,6 +64,7 @@ type stashViewState int
 
 const (
 	stashStateReady stashViewState = iota
+	stashStateSearching
 	stashStateLoadingDocument
 	stashStateShowingError
 )
@@ -141,6 +144,7 @@ type stashModel struct {
 	err                error
 	spinner            spinner.Model
 	filterInput        textinput.Model
+	searchInput        textinput.Model
 	viewState          stashViewState
 	filterState        filterState
 	showFullHelp       bool
@@ -210,6 +214,9 @@ func (m *stashModel) setSize(width, height int) {
 
 	m.filterInput.Width = width - stashViewHorizontalPadding*2 - ansi.PrintableRuneWidth(
 		m.filterInput.Prompt,
+	)
+	m.searchInput.Width = width - stashViewHorizontalPadding*2 - ansi.PrintableRuneWidth(
+		m.searchInput.Prompt,
 	)
 
 	m.updatePagination()
@@ -314,6 +321,16 @@ func (m stashModel) getVisibleMarkdowns() []*markdown {
 	return m.markdowns
 }
 
+func (m *stashModel) getSearchResults(searchPhrase string) tea.Cmd {
+	return func() tea.Msg {
+		res, err := docs.Search(searchPhrase)
+		if err != nil {
+			panic(err) // todo - more graceful
+		}
+		return searchMessage(res)
+	}
+}
+
 // Command for opening a markdown document in the pager. Note that this also
 // alters the model.
 func (m *stashModel) openMarkdown(md *markdown) tea.Cmd {
@@ -378,11 +395,17 @@ func newStashModel(common *commonModel) stashModel {
 	sp.Spinner = spinner.Line
 	sp.Style = stashSpinnerStyle
 
-	si := textinput.New()
-	si.Prompt = "Find:"
-	si.PromptStyle = stashInputPromptStyle
-	si.Cursor.Style = stashInputCursorStyle
-	si.Focus()
+	filterInput := textinput.New()
+	filterInput.Prompt = "Find:"
+	filterInput.PromptStyle = stashInputPromptStyle
+	filterInput.Cursor.Style = stashInputCursorStyle
+	filterInput.Focus()
+
+	searchInput := textinput.New()
+	searchInput.Prompt = "Search:"
+	searchInput.PromptStyle = stashInputPromptStyle
+	searchInput.Cursor.Style = stashInputCursorStyle
+	searchInput.Focus()
 
 	s := []section{
 		sections[documentsSection],
@@ -391,7 +414,8 @@ func newStashModel(common *commonModel) stashModel {
 	m := stashModel{
 		common:      common,
 		spinner:     sp,
-		filterInput: si,
+		filterInput: filterInput,
+		searchInput: searchInput,
 		serverPage:  1,
 		sections:    s,
 	}
@@ -436,6 +460,17 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 		if applicationContext(msg) == stashContext {
 			m.hideStatusMessage()
 		}
+
+	case searchMessage:
+		log.Debug(msg.QueryID)
+		log.Debug(msg.QueryID)
+		log.Debug(msg.QueryID)
+		log.Debug(msg.QueryID)
+	}
+
+	if m.viewState == stashStateSearching {
+		cmds = append(cmds, m.handleSearching(msg))
+		return m, tea.Batch(cmds...)
 	}
 
 	if m.filterState == filtering {
@@ -445,7 +480,7 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 
 	// Updates per the current state
 	switch m.viewState { //nolint:exhaustive
-	case stashStateReady:
+	case stashStateReady, stashStateSearching:
 		cmds = append(cmds, m.handleDocumentBrowsing(msg))
 	case stashStateShowingError:
 		// Any key exists the error view
@@ -458,6 +493,7 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 }
 
 // Updates for when a user is browsing the markdown listing.
+// todo - separate method for searching???
 func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -467,6 +503,12 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	// Handle keys
 	case tea.KeyMsg:
 		switch msg.String() {
+		case "s":
+			m.hideStatusMessage() // todo - this needed?
+			m.viewState = stashStateSearching
+			m.searchInput.CursorEnd()
+			m.searchInput.Focus()
+			return textinput.Blink
 		case "k", "ctrl+k", "up":
 			m.moveCursorUp()
 
@@ -586,6 +628,33 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *stashModel) handleSearching(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	if msg, ok := msg.(tea.KeyMsg); ok { //nolint:nestif
+		switch msg.String() {
+		case keyEsc:
+			m.filterInput.Reset() // todo -more to do here?
+		case keyEnter:
+			cmds = append(cmds, m.getSearchResults(m.searchInput.Value()))
+		case "tab", "shift+tab", "ctrl+k", "up", "ctrl+j", "down":
+			m.hideStatusMessage()
+
+			m.searchInput.Blur()
+
+			if m.searchInput.Value() == "" {
+				m.filterInput.Reset()
+			}
+		}
+	}
+
+	// Update the search text input component
+	newSearchInputModel, inputCmd := m.searchInput.Update(msg)
+	m.searchInput = newSearchInputModel
+	cmds = append(cmds, inputCmd)
+	return tea.Batch(cmds...)
+}
+
 // Updates for when a user is in the filter editing interface.
 func (m *stashModel) handleFiltering(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
@@ -659,6 +728,8 @@ func (m *stashModel) handleFiltering(msg tea.Msg) tea.Cmd {
 func (m stashModel) view() string {
 	var s string
 	switch m.viewState {
+	case stashStateSearching:
+		return searchBoxStyle.Render(m.searchInput.View())
 	case stashStateShowingError:
 		return errorView(m.err, false)
 	case stashStateLoadingDocument:

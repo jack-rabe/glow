@@ -33,7 +33,7 @@ func newHelpColumn(pairs ...string) (h helpColumn) {
 func (h helpColumn) render(height int) (rows []string) {
 	keyWidth, valWidth := h.maxWidths()
 
-	for i := 0; i < height; i++ {
+	for i := range height {
 		var (
 			b    = strings.Builder{}
 			k, v string
@@ -128,7 +128,7 @@ func (m stashModel) helpView() (string, int) {
 	if m.filterApplied() {
 		filterHelp = []string{"/", "edit search", "esc", "clear filter"}
 	} else {
-		filterHelp = []string{"/", "find"}
+		filterHelp = []string{"/", "find", "s", "search"}
 	}
 
 	// If there are errors
@@ -264,7 +264,7 @@ func mergeColumns(cols ...[]string) string {
 	}
 
 	b := strings.Builder{}
-	for i := 0; i < tallestCol; i++ {
+	for i := range tallestCol {
 		for j, col := range cols {
 			if i >= len(col) {
 				continue // skip if we're past the length of this column

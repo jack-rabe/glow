@@ -32,10 +32,11 @@ var (
 	// CommitSHA as provided by goreleaser.
 	CommitSHA = ""
 
-	readmeNames      = []string{"README.md", "README", "Readme.md", "Readme", "readme.md", "readme"}
-	configFile       string
-	pager            bool
-	tui              bool
+	readmeNames = []string{"README.md", "README", "Readme.md", "Readme", "readme.md", "readme"}
+	configFile  string
+	pager       bool
+	tui         bool
+	// todo - play with styles - especially bold
 	style            string
 	width            uint
 	showAllFiles     bool
@@ -190,8 +191,8 @@ func validateOptions(cmd *cobra.Command) error {
 				width = uint(w) //nolint:gosec
 			}
 
-			if width > 120 {
-				width = 120
+			if width > uint(MAX_WIDTH) {
+				width = uint(MAX_WIDTH)
 			}
 		}
 		if width == 0 {

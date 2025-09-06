@@ -11,4 +11,5 @@ var (
 			Width(78).
 			Padding(0, 0, 0, 2).
 			Render
+	MAX_WIDTH = 140
 )

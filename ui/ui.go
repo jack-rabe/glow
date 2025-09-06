@@ -31,14 +31,6 @@ var (
 
 // NewProgram returns a new Tea program.
 func NewProgram(cfg Config, content string) *tea.Program {
-	log.Debug(
-		"Starting glow",
-		"high_perf_pager",
-		cfg.HighPerformancePager,
-		"glamour",
-		cfg.GlamourEnabled,
-	)
-
 	config = cfg
 	opts := []tea.ProgramOption{tea.WithAltScreen()}
 	if cfg.EnableMouse {
@@ -356,7 +348,6 @@ func errorView(err error, fatal bool) string {
 
 func findLocalFiles(m commonModel) tea.Cmd {
 	return func() tea.Msg {
-		log.Info("findLocalFiles")
 		var (
 			cwd = m.cfg.Path
 			err error
@@ -377,8 +368,6 @@ func findLocalFiles(m commonModel) tea.Cmd {
 			log.Error("error finding local files", "error", err)
 			return errMsg{err}
 		}
-
-		log.Debug("local directory is", "cwd", cwd)
 
 		// Switch between FindFiles and FindAllFiles to bypass .gitignore rules
 		var ch chan gitcha.SearchResult
@@ -406,7 +395,6 @@ func findNextLocalFile(m model) tea.Cmd {
 			return foundLocalFileMsg(res)
 		}
 		// We're done
-		log.Debug("local file search finished")
 		return localFileSearchFinished{}
 	}
 }
