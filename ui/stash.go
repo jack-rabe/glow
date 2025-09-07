@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/paginator"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -63,8 +64,9 @@ type (
 type stashViewState int
 
 const (
-	stashStateReady stashViewState = iota
-	stashStateSearching
+	stashStateReady     stashViewState = iota
+	stashStateSearching                // docs
+	stashStateSelecting                // docs
 	stashStateLoadingDocument
 	stashStateShowingError
 )
@@ -170,11 +172,8 @@ type stashModel struct {
 	// reason, this field should be considered ephemeral.
 	filteredMarkdowns []*markdown
 
-	// Page we're fetching stash items from on the server, which is different
-	// from the local pagination. Generally, the server will return more items
-	// than we can display at a time so we can paginate locally without having
-	// to fetch every time.
-	serverPage int64
+	searchResults     []docs.TextExcerptSuggestion
+	searchResultsList list.Model
 }
 
 func (m stashModel) loadingDone() bool {
@@ -416,7 +415,6 @@ func newStashModel(common *commonModel) stashModel {
 		spinner:     sp,
 		filterInput: filterInput,
 		searchInput: searchInput,
-		serverPage:  1,
 		sections:    s,
 	}
 
@@ -462,14 +460,27 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 		}
 
 	case searchMessage:
-		log.Debug(msg.QueryID)
-		log.Debug(msg.QueryID)
-		log.Debug(msg.QueryID)
-		log.Debug(msg.QueryID)
+		// todo - move this to tea.Cmd?
+		results := []docs.TextExcerptSuggestion{}
+		items := []list.Item{}
+		for _, sug := range msg.Suggestions {
+			results = append(results, sug.TextExcerptSuggestion)
+			items = append(items, searchItem(sug.TextExcerptSuggestion.Title))
+		}
+		m.searchResults = results
+		m.searchResultsList = list.New(items, searchItemDelegate{}, 30, 40) // todo - actual w + h
+		m.searchResultsList.SetShowTitle(false)
+		m.searchResultsList.SetFilteringEnabled(false)
+		m.viewState = stashStateSelecting
 	}
 
 	if m.viewState == stashStateSearching {
 		cmds = append(cmds, m.handleSearching(msg))
+		return m, tea.Batch(cmds...)
+	}
+
+	if m.viewState == stashStateSelecting {
+		cmds = append(cmds, m.handleSelecting(msg))
 		return m, tea.Batch(cmds...)
 	}
 
@@ -478,9 +489,11 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 		return m, tea.Batch(cmds...)
 	}
 
+	// todo - handle the list somewhere of search results
+
 	// Updates per the current state
 	switch m.viewState { //nolint:exhaustive
-	case stashStateReady, stashStateSearching:
+	case stashStateReady:
 		cmds = append(cmds, m.handleDocumentBrowsing(msg))
 	case stashStateShowingError:
 		// Any key exists the error view
@@ -493,7 +506,6 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 }
 
 // Updates for when a user is browsing the markdown listing.
-// todo - separate method for searching???
 func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -504,7 +516,7 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "s":
-			m.hideStatusMessage() // todo - this needed?
+			m.hideStatusMessage()
 			m.viewState = stashStateSearching
 			m.searchInput.CursorEnd()
 			m.searchInput.Focus()
@@ -628,13 +640,19 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *stashModel) handleSelecting(msg tea.Msg) tea.Cmd {
+	newListModel, cmd := m.searchResultsList.Update(msg)
+	m.searchResultsList = newListModel
+	return cmd
+}
+
 func (m *stashModel) handleSearching(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	if msg, ok := msg.(tea.KeyMsg); ok { //nolint:nestif
 		switch msg.String() {
 		case keyEsc:
-			m.filterInput.Reset() // todo -more to do here?
+			m.searchInput.Reset() // todo -more to do here?
 		case keyEnter:
 			cmds = append(cmds, m.getSearchResults(m.searchInput.Value()))
 		case "tab", "shift+tab", "ctrl+k", "up", "ctrl+j", "down":
@@ -728,8 +746,28 @@ func (m *stashModel) handleFiltering(msg tea.Msg) tea.Cmd {
 func (m stashModel) view() string {
 	var s string
 	switch m.viewState {
-	case stashStateSearching:
-		return searchBoxStyle.Render(m.searchInput.View())
+	case stashStateSearching, stashStateSelecting:
+		searchInputView := searchBoxStyle.Render(m.searchInput.View())
+
+		if len(m.searchResults) > 0 {
+			searchResultsView := lipgloss.NewStyle().
+				MarginRight(2).
+				Render(m.searchResultsList.View())
+			selectedIdx := m.searchResultsList.Index()
+			selectedResult := m.searchResults[selectedIdx]
+
+			w := 55
+			titleStyle := lipgloss.NewStyle().Bold(true).Width(w)
+			summaryStyle := lipgloss.NewStyle().Width(w)
+			title := titleStyle.Render(selectedResult.Title)
+			summary := summaryStyle.Render(selectedResult.Summary)
+			s3 := fmt.Sprintf("%s\n------------------------\n%s", title, summary)
+
+			searchResultsView = lipgloss.JoinHorizontal(0, searchResultsView, s3)
+			return lipgloss.JoinVertical(0, searchInputView, searchResultsView)
+		} else {
+			return searchInputView
+		}
 	case stashStateShowingError:
 		return errorView(m.err, false)
 	case stashStateLoadingDocument:
@@ -751,7 +789,7 @@ func (m stashModel) view() string {
 		} else if m.filterState == filtering {
 			logoOrFilter += m.filterInput.View()
 		} else {
-			logoOrFilter += glowLogoView()
+			logoOrFilter += doxLogoView()
 			if m.showStatusMessage {
 				logoOrFilter += "  " + m.statusMessage.String()
 			}
@@ -807,8 +845,8 @@ func (m stashModel) view() string {
 	return "\n" + indent(s, stashIndent)
 }
 
-func glowLogoView() string {
-	return logoStyle.Render(" Glow ")
+func doxLogoView() string {
+	return logoStyle.Render(" Dox ")
 }
 
 func (m stashModel) headerView() string {

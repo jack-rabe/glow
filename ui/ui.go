@@ -216,10 +216,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			if m.state == stateShowStash {
 				// pass through all keys if we're editing the filter
-				if m.stash.filterState == filtering {
+				if m.stash.filterState == filtering || m.stash.viewState == stashStateSearching {
 					m.stash, cmd = m.stash.update(msg)
 					return m, cmd
 				}
+
 				m.stash.markdowns = nil
 				return m, m.Init()
 			}
@@ -230,7 +231,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.state { //nolint:exhaustive
 			case stateShowStash:
 				// pass through all keys if we're editing the filter
-				if m.stash.filterState == filtering {
+				if m.stash.filterState == filtering || m.stash.viewState == stashStateSearching {
 					m.stash, cmd = m.stash.update(msg)
 					return m, cmd
 				}

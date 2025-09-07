@@ -285,7 +285,7 @@ func (m pagerModel) statusBarView(b *strings.Builder) {
 	showStatusMessage := m.state == pagerStateStatusMessage
 
 	// Logo
-	logo := glowLogoView()
+	logo := doxLogoView()
 
 	// Scroll percent
 	percent := math.Max(minPercent, math.Min(maxPercent, m.viewport.ScrollPercent()))
