@@ -58,8 +58,6 @@ func GetPage(url string) error {
 	fileName = strings.ReplaceAll(fileName, "/", "-")
 	fileName += ".md"
 	markdown := extractContentFromHTML(string(bodyBytes))
-	fmt.Println(fileName)
-	fmt.Println(markdown)
 	err = os.WriteFile(fileName, []byte(markdown), 0777)
 	if err != nil {
 		return err
@@ -69,7 +67,7 @@ func GetPage(url string) error {
 
 func extractContentFromHTML(html string) string {
 	if strings.TrimSpace(html) == "" {
-		return "<e>Empty HTML content</e>"
+		return "<e>Empty HTML content</e>" // todo - fix
 	}
 
 	// Parse HTML using goquery (like BeautifulSoup)
@@ -142,7 +140,7 @@ func extractContentFromHTML(html string) string {
 	// (Optional) Remove specific tags - not built-in like markdownify's `strip`, but you can preprocess if needed
 	markdown, err := converter.ConvertString(cleanedHTML)
 	if err != nil || strings.TrimSpace(markdown) == "" {
-		// todo - fix
+		// todo - fix all of these and throw errors
 		return "<e>Page failed to be simplified from HTML</e>"
 	}
 

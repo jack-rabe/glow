@@ -56,6 +56,7 @@ type (
 	filteredMarkdownMsg []*markdown
 	fetchedMarkdownMsg  *markdown
 	searchMessage       docs.SearchResponse
+	docFetchedMessage   string
 )
 
 // MODEL
@@ -459,6 +460,9 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 			m.hideStatusMessage()
 		}
 
+	// case docFetchedMessage:
+	// 	log.Debug("fetched!")
+	//
 	case searchMessage:
 		// todo - move this to tea.Cmd?
 		results := []docs.TextExcerptSuggestion{}
@@ -641,9 +645,26 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 }
 
 func (m *stashModel) handleSelecting(msg tea.Msg) tea.Cmd {
-	newListModel, cmd := m.searchResultsList.Update(msg)
+	newListModel, listCmd := m.searchResultsList.Update(msg)
 	m.searchResultsList = newListModel
-	return cmd
+
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch msg.String() {
+		case keyEnter:
+			selectedIdx := m.searchResultsList.Index()
+			fetchDocsCmd := func() tea.Msg {
+				url := m.searchResults[selectedIdx].Link
+				err := docs.GetPage(url)
+				if err != nil {
+					panic(err) // todo - handle gracefully
+				}
+				return docFetchedMessage(url)
+			}
+			return tea.Batch(listCmd, fetchDocsCmd)
+		}
+	}
+
+	return listCmd
 }
 
 func (m *stashModel) handleSearching(msg tea.Msg) tea.Cmd {
@@ -741,8 +762,6 @@ func (m *stashModel) handleFiltering(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// VIEW
-
 func (m stashModel) view() string {
 	var s string
 	switch m.viewState {
@@ -756,7 +775,7 @@ func (m stashModel) view() string {
 			selectedIdx := m.searchResultsList.Index()
 			selectedResult := m.searchResults[selectedIdx]
 
-			w := 55
+			w := 55 // todo - not hardcoded
 			titleStyle := lipgloss.NewStyle().Bold(true).Width(w)
 			summaryStyle := lipgloss.NewStyle().Width(w)
 			title := titleStyle.Render(selectedResult.Title)
