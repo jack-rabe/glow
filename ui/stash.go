@@ -460,8 +460,12 @@ func (m stashModel) update(msg tea.Msg) (stashModel, tea.Cmd) {
 			m.hideStatusMessage()
 		}
 
-	// case docFetchedMessage:
-	// 	log.Debug("fetched!")
+	case docFetchedMessage:
+		// todo - refresh docs automatically (after escaping here)
+		// todo - reset search filter and stuff
+		m.viewState = stashStateReady // this probably isn't needed
+		md := &markdown{localPath: string(msg)}
+		cmds = append(cmds, m.openMarkdown(md))
 	//
 	case searchMessage:
 		// todo - move this to tea.Cmd?
@@ -644,6 +648,7 @@ func (m *stashModel) handleDocumentBrowsing(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// todo - help menu for this page + logo shown
 func (m *stashModel) handleSelecting(msg tea.Msg) tea.Cmd {
 	newListModel, listCmd := m.searchResultsList.Update(msg)
 	m.searchResultsList = newListModel
@@ -654,11 +659,11 @@ func (m *stashModel) handleSelecting(msg tea.Msg) tea.Cmd {
 			selectedIdx := m.searchResultsList.Index()
 			fetchDocsCmd := func() tea.Msg {
 				url := m.searchResults[selectedIdx].Link
-				err := docs.GetPage(url)
+				writtenFilePath, err := docs.GetPage(url)
 				if err != nil {
 					panic(err) // todo - handle gracefully
 				}
-				return docFetchedMessage(url)
+				return docFetchedMessage(writtenFilePath)
 			}
 			return tea.Batch(listCmd, fetchDocsCmd)
 		}

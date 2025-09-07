@@ -13,7 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func GetPage(url string) error {
+func GetPage(url string) (string, error) {
 	// Create HTTP client with timeout and redirect support
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -24,7 +24,7 @@ func GetPage(url string) error {
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to create request for %s: %v", url, err)
 		log.Println(errorMsg)
-		return fmt.Errorf(errorMsg)
+		return "", fmt.Errorf(errorMsg)
 	}
 
 	req.Header.Set("User-Agent", USER_AGENT)
@@ -34,7 +34,7 @@ func GetPage(url string) error {
 	if err != nil {
 		errorMsg := fmt.Sprintf("Failed to fetch %s: %v", url, err)
 		log.Println(errorMsg)
-		return fmt.Errorf(errorMsg)
+		return "", fmt.Errorf(errorMsg)
 	}
 	defer resp.Body.Close()
 
@@ -42,7 +42,7 @@ func GetPage(url string) error {
 	if resp.StatusCode >= 400 {
 		errorMsg := fmt.Sprintf("Failed to fetch %s - status code %d", url, resp.StatusCode)
 		log.Println(errorMsg)
-		return fmt.Errorf(errorMsg)
+		return "", fmt.Errorf(errorMsg)
 	}
 
 	// Read response body
@@ -50,7 +50,7 @@ func GetPage(url string) error {
 	if err != nil {
 		errorMsg := fmt.Sprintf("Error reading response body from %s: %v", url, err)
 		log.Println(errorMsg)
-		return fmt.Errorf(errorMsg)
+		return "", fmt.Errorf(errorMsg)
 	}
 
 	fileName := strings.TrimSuffix(url, ".html")
@@ -60,9 +60,9 @@ func GetPage(url string) error {
 	markdown := extractContentFromHTML(string(bodyBytes))
 	err = os.WriteFile(fileName, []byte(markdown), 0777)
 	if err != nil {
-		return err
+		return "", err
 	}
-	return nil
+	return fileName, nil
 }
 
 func extractContentFromHTML(html string) string {
